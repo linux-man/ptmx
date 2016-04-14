@@ -30,11 +30,11 @@ void draw(){
   if(up) y -= 3;
   if(down) y += 3;
   PVector overTile = map.canvasToMap(x, y);
-  switch(map.getTileInfo(0, round(overTile.x), round(overTile.y))){
+  switch(map.getTileIndex(0, round(overTile.x), round(overTile.y))){
     case 6: case 7: case 13: case 14: case 15: case 21: case 22: case 23: case 29:
       break;
     case 30: case 37: case 38: case 39: case 46: case 47:
-      map.setTileInfo(0, round(overTile.x), round(overTile.y), 29);
+      map.setTileIndex(0, round(overTile.x), round(overTile.y), 29);
       break;
     default:
       x = prevX;

@@ -37,21 +37,21 @@ Example: Ptmx map = new Ptmx(this, "desert.tmx");
 ###void draw()
 Draw map at position (0, 0), just for a quick test.
   
+###void draw(PGraphics pg)
+Draw map on a given PGraphics at position (0, 0).
+
 ###void draw(PVector position)
 ###void draw(float left, float top)
 Draw map at position (left, top).
   
-###void draw(int layer, PVector position)
-###void draw(int layer, float left, float top)
-Draw a specific layer
-
-###void draw(PGraphics pg)
-Draw map on a given PGraphics at position (0, 0).
-
 ###void draw(PGraphics pg, PVector position)
 ###void draw(PGraphics pg, float left, float top)
 Draw map on a given PGraphics at position (left, top).
   
+###void draw(int layer, PVector position)
+###void draw(int layer, float left, float top)
+Draw a specific layer at position (left, top).
+
 ###void draw(PGraphics pg, int layer, PVector position)
 ###void draw(PGraphics pg, int layer, float left, float top)
 Draw a specific layer on a given PGraphics at position (left, top).
@@ -60,39 +60,39 @@ Draw a specific layer on a given PGraphics at position (left, top).
 ##Layers methods
 All this methods need a layer index
 
-###String getType(int index)
+###String getType(int layer)
 Return "layer", "imagelayer" or "objectgroup".
 
-###boolean getVisible(int index)
-###void setVisible(int index, boolean visible)
+###boolean getVisible(int layer)
+###void setVisible(int layer, boolean visible)
 Visible property is ignored when drawing individual layers.
 
-###PImage getImage(int index)
+###PImage getImage(int layer)
 Return null if layer is not a image layer or index is out of bounds
 
-###StringDict[] getObjects(int index)
+###StringDict[] getObjects(int layer)
 Return null if layer is not a object layer or index is out of bounds
 
-###int getObjectsColor(int index)
+###int getObjectsColor(int layer)
 Return black if not defined, layer is not a image layer or index is out of bounds
 
-###int[] getData(int index)
+###int[] getData(int layer)
 Return null if layer is not a tile layer or index is out of bounds
-Attention: Tiled store tiles index as index + 1, so 0 is a "no tile". This is internal data, and looks different than what you get if you use set/getTileInfo.
+Attention: Tiled store tiles index as index + 1, so 0 is a "no tile". This is internal data, and looks different than what you get if you use set/getTileIndex.
 
-###StringDict getCustomProperties(int index)
+###StringDict getCustomProperties(int layer)
 
-###float getOpacity(int index)
-###void setOpacity(int index, float opacity)
+###float getOpacity(int layer)
+###void setOpacity(int layer, float opacity)
 Opacity is used when drawing individual layers (and on toImage method).
 
-###int getTileIndex(int index, int x, int y)
-###void setTileIndex(int index, int x, int y, int value)
+###int getTileIndex(int layer, int x, int y)
+###void setTileIndex(int layer, int x, int y, int value)
 Tile indexes are the same you see on Tiled.
 -1 for "no tile".
 Return -2 if coordinates are out of bounds.
 
-###void toImage(int index)
+###void toImage(int layer)
 Turn a object or tile layer into a image layer. May be useful if you don't need tile or object info, and want a specific opacity on a layer. Opacity is used when creating the image. The created image is truncated to map limits.
   
 ##Map methods
@@ -139,7 +139,7 @@ In "MAP" PositionMode, coordinates are relative to tiles, so (5, 4) points to th
 ###PVector getPosition()
 Return last draw position. Dependent of DrawMode and PositionMode
 
-##Coordinates Conversion methods
+##Conversion of Coordinates methods
   
 ###PVector canvasToMap(PVector p)
 ###PVector canvasToMap(float x, float y)

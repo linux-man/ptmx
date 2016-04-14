@@ -32,11 +32,11 @@ void keyPressed(){
   if(keyCode == UP) y--;
   if(keyCode == DOWN) y++;
   // Tiled store tiles index + 1 (to use 0 as empty). Ptmx stores the info unchanged, but shows the same index Tiled show.
-  switch(map.getTileInfo(0, x, y)){
+  switch(map.getTileIndex(0, x, y)){
     case 6: case 7: case 13: case 14: case 15: case 21: case 22: case 23: case 29:
       break;
     case 30: case 37: case 38: case 39: case 46: case 47:
-      map.setTileInfo(0, x, y, 29);
+      map.setTileIndex(0, x, y, 29);
       break;
     default:
       x = prevX;
