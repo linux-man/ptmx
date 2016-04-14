@@ -1,5 +1,3 @@
-package ptmx;
-
 import processing.core.PApplet;
 import processing.core.PImage;
 import processing.core.PGraphics;
@@ -12,11 +10,161 @@ public class Ptmx {
   private float version;
   private String filename, orientation, renderorder, staggeraxis;//renderorder is not used. Always "right-down"
   private int camwidth, camheight, camleft, camtop, mapwidth, mapheight, tilewidth, tileheight, staggerindex, hexsidelength, backgroundcolor;
-  private int drawmargin = 1;//only for orthogonal. Other geometries are not optimized
+  private int drawmargin = 2;
   private int drawmode = 0;//0=CORNER, 3=CENTER
   private String positionmode = "CANVAS";//"CANVAS" or "MAP"
   private Tile[] tile = new Tile[0];
   private Layer[] layer = new Layer[0];
+  private Xmap map;
+
+  abstract class Xmap{
+    abstract PVector mapToCanvas(float nx, float ny);
+    abstract PVector canvasToMap(float x, float y);
+    abstract void drawTileLayer(PGraphics pg, int m);
+  }
+
+  private class OrthogonalMap extends Xmap{
+    public PVector mapToCanvas(float nx, float ny){
+      float x = (nx + (float)0.5) * Ptmx.this.tilewidth;
+      float y = (ny + (float)0.5) * Ptmx.this.tileheight;
+      return new PVector(x , y);
+    }
+    public PVector canvasToMap(float x, float y){
+      float nx = x / Ptmx.this.tilewidth - (float)0.5;
+      float ny = y / Ptmx.this.tileheight - (float)0.5;
+      return new PVector(nx, ny);
+    }
+    public void drawTileLayer(PGraphics pg, int m){
+      int n;
+      float x, y;
+      PVector p;
+      Tile tileN;
+      Layer l = Ptmx.this.layer[m];
+      int xstart = parent.max(0, parent.floor(this.canvasToMap(Ptmx.this.camleft, Ptmx.this.camtop).x - Ptmx.this.drawmargin));
+      int xstop = parent.min(Ptmx.this.mapwidth, parent.ceil(this.canvasToMap(Ptmx.this.camleft + pg.width, Ptmx.this.camtop + pg.height).x + Ptmx.this.drawmargin));
+      int ystart = parent.max(0, parent.floor(this.canvasToMap(Ptmx.this.camleft, Ptmx.this.camtop).y - Ptmx.this.drawmargin));
+      int ystop = parent.min(Ptmx.this.mapheight, parent.ceil(this.canvasToMap(Ptmx.this.camleft + pg.width, Ptmx.this.camtop + pg.height).y + Ptmx.this.drawmargin));
+      for(int ny = ystart; ny < ystop; ny++) for(int nx = xstart; nx < xstop; nx++){
+        n = l.data[nx + ny * Ptmx.this.mapwidth] - 1;
+        if(n >= 0){
+          tileN = Ptmx.this.tile[n];
+          p = Ptmx.this.mapToCam(nx, ny);
+          x = p.x - Ptmx.this.tilewidth / 2 + tileN.offsetx + l.offsetx;
+          y = p.y - Ptmx.this.tileheight / 2 + tileN.offsety + l.offsety + (Ptmx.this.tileheight - tileN.image.height);;
+          pg.image(tileN.image, x, y);
+        }
+      }
+    }
+  }
+
+  private class IsometricMap extends Xmap{
+    public PVector mapToCanvas(float nx, float ny){
+      float x = (Ptmx.this.mapwidth + Ptmx.this.mapheight) * Ptmx.this.tilewidth / 4 + (nx - ny) * Ptmx.this.tilewidth / 2;
+      float y = (nx + ny + 1) * Ptmx.this.tileheight / 2;
+      return new PVector(x , y);
+    }
+    public PVector canvasToMap(float x, float y){
+      float dif = ((float)Ptmx.this.mapwidth + Ptmx.this.mapheight) * Ptmx.this.tilewidth / 4;
+      float nx = y / Ptmx.this.tileheight + ((x - dif) / Ptmx.this.tilewidth) - (float)0.5;
+      float ny = y / Ptmx.this.tileheight - ((x - dif) / Ptmx.this.tilewidth) - (float)0.5;
+      return new PVector(nx, ny);
+    }
+    public void drawTileLayer(PGraphics pg, int m){
+      int n;
+      float x, y;
+      PVector p;
+      Tile tileN;
+      Layer l = Ptmx.this.layer[m];
+      int xstart = parent.max(0, parent.floor(this.canvasToMap(Ptmx.this.camleft, Ptmx.this.camtop).x - Ptmx.this.drawmargin));
+      int xstop = parent.min(Ptmx.this.mapwidth, parent.ceil(this.canvasToMap(Ptmx.this.camleft + pg.width, Ptmx.this.camtop + pg.height).x + Ptmx.this.drawmargin));
+      int ystart = parent.max(0, parent.floor(this.canvasToMap(Ptmx.this.camleft + pg.width, Ptmx.this.camtop).y - Ptmx.this.drawmargin));
+      int ystop = parent.min(Ptmx.this.mapheight, parent.ceil(this.canvasToMap(Ptmx.this.camleft, Ptmx.this.camtop + pg.height).y + Ptmx.this.drawmargin));
+      for(int ny = ystart; ny < ystop; ny++) for(int nx = xstart; nx < xstop; nx++){
+        n = l.data[nx + ny * Ptmx.this.mapwidth] - 1;
+        if(n >= 0){
+          tileN = Ptmx.this.tile[n];
+          p = Ptmx.this.mapToCam(nx, ny);
+          x = p.x - Ptmx.this.tilewidth / 2 + tileN.offsetx + l.offsetx;
+          y = p.y - Ptmx.this.tileheight / 2 + tileN.offsety + l.offsety + (Ptmx.this.tileheight - tileN.image.height);;
+          pg.image(tileN.image, x, y);
+        }
+      }
+    }
+  }
+
+  private class StaggeredXMap extends Xmap{
+    public PVector mapToCanvas(float nx, float ny){
+      float x = (nx * (Ptmx.this.hexsidelength + Ptmx.this.tilewidth) + Ptmx.this.tilewidth) / 2;
+      float y = (ny + (float)0.5 + Ptmx.this.staggerindex / 2) * Ptmx.this.tileheight + (Ptmx.this.staggerindex * 2 - 1) * (parent.abs(parent.abs(nx) % 2 - 1) - 1) * (Ptmx.this.tileheight) / 2;
+      return new PVector(x , y);
+    }
+    public PVector canvasToMap(float x, float y){
+      float ny;
+      float nx = (x * 2 - Ptmx.this.tilewidth) / (Ptmx.this.hexsidelength + Ptmx.this.tilewidth);
+      if(Ptmx.this.staggerindex == 0) ny = y / Ptmx.this.tileheight - 1 + (parent.abs(parent.abs(nx) % 2 - 1)) / 2;
+      else ny = y / Ptmx.this.tileheight - (float)0.5 - (parent.abs(parent.abs(nx) % 2 - 1)) / 2;
+      return new PVector(nx, ny);
+    }
+    public void drawTileLayer(PGraphics pg, int m){
+      int n;
+      float x, y;
+      PVector p;
+      Tile tileN;
+      Layer l = Ptmx.this.layer[m];
+      int xstart = parent.floor(this.canvasToMap(Ptmx.this.camleft, Ptmx.this.camtop).x - Ptmx.this.drawmargin);
+      xstart = parent.max(0, xstart - xstart % 2);
+      int xstop = parent.min(Ptmx.this.mapwidth, parent.ceil(this.canvasToMap(Ptmx.this.camleft + pg.width, Ptmx.this.camtop + pg.height).x + Ptmx.this.drawmargin));
+      int ystart = parent.max(0, parent.floor(this.canvasToMap(Ptmx.this.camleft, Ptmx.this.camtop).y - Ptmx.this.drawmargin));
+      int ystop = parent.min(Ptmx.this.mapheight, parent.ceil(this.canvasToMap(Ptmx.this.camleft + pg.width, Ptmx.this.camtop + pg.height).y + Ptmx.this.drawmargin));
+      for(int ny = ystart; ny < ystop; ny++) for(int nx = xstart; nx < xstop; nx++){
+        n = l.data[nx + ny * Ptmx.this.mapwidth] - 1;
+        if(n >= 0){
+          tileN = Ptmx.this.tile[n];
+          p = Ptmx.this.mapToCam(nx, ny);
+          x = p.x - Ptmx.this.tilewidth / 2 + tileN.offsetx + l.offsetx;
+          y = p.y - Ptmx.this.tileheight / 2 + tileN.offsety + l.offsety + (Ptmx.this.tileheight - tileN.image.height);;
+          pg.image(tileN.image, x, y);
+        }
+      }
+    }
+  }
+
+  private class StaggeredYMap extends Xmap{
+    public PVector mapToCanvas(float nx, float ny){
+      float y = ny * (Ptmx.this.hexsidelength + Ptmx.this.tileheight) / 2 + Ptmx.this.tileheight / 2;
+      float x = (nx + (float)0.5 + Ptmx.this.staggerindex / 2) * Ptmx.this.tilewidth + (Ptmx.this.staggerindex * 2 - 1) * (parent.abs(parent.abs(y) % 2 - 1) - 1) * (Ptmx.this.tilewidth) / 2;
+      return new PVector(x , y);
+    }
+    public PVector canvasToMap(float x, float y){
+      float nx;
+      float ny = (y * 2 - Ptmx.this.tileheight) / (Ptmx.this.hexsidelength + Ptmx.this.tileheight);
+      if (Ptmx.this.staggerindex == 0) nx = x / Ptmx.this.tilewidth - 1 + (parent.abs(parent.abs(ny) % 2 - 1)) / 2;
+      else nx = x / Ptmx.this.tilewidth - (float)0.5 - (parent.abs(parent.abs(ny) % 2 - 1)) / 2;
+      return new PVector(nx, ny);
+    }
+    public void drawTileLayer(PGraphics pg, int m){
+      int n;
+      float x, y;
+      PVector p;
+      Tile tileN;
+      Layer l = Ptmx.this.layer[m];
+      int xstart = parent.floor(this.canvasToMap(Ptmx.this.camleft, Ptmx.this.camtop).x - Ptmx.this.drawmargin);
+      xstart = parent.max(0, xstart - xstart % 2);
+      int xstop = parent.min(Ptmx.this.mapwidth, parent.ceil(this.canvasToMap(Ptmx.this.camleft + pg.width, Ptmx.this.camtop + pg.height).x + Ptmx.this.drawmargin));
+      int ystart = parent.max(0, parent.floor(this.canvasToMap(Ptmx.this.camleft, Ptmx.this.camtop).y - Ptmx.this.drawmargin));
+      int ystop = parent.min(Ptmx.this.mapheight, parent.ceil(this.canvasToMap(Ptmx.this.camleft + pg.width, Ptmx.this.camtop + pg.height).y + Ptmx.this.drawmargin));
+      for(int ny = ystart; ny < ystop; ny++) for(int nx = xstart; nx < xstop; nx++){
+        n = l.data[nx + ny * Ptmx.this.mapwidth] - 1;
+        if(n >= 0){
+          tileN = Ptmx.this.tile[n];
+          p = Ptmx.this.mapToCam(nx, ny);
+          x = p.x - Ptmx.this.tilewidth / 2 + tileN.offsetx + l.offsetx;
+          y = p.y - Ptmx.this.tileheight / 2 + tileN.offsety + l.offsety + (Ptmx.this.tileheight - tileN.image.height);;
+          pg.image(tileN.image, x, y);
+        }
+      }
+    }
+  }
 
   private class Tile{
     private PImage image;
@@ -27,7 +175,7 @@ public class Ptmx {
       this.offsety = offsety;
     }
   }
-  
+
   private class Layer{
     private String type, name;
     private boolean visible;
@@ -49,9 +197,9 @@ public class Ptmx {
       this.objects = objects;
       this.objcolor = objcolor;
       this.properties = properties;
-    }    
+    }
   }
-  
+
   public Ptmx(PApplet p, String filename){
     this.parent = p;
     this.camwidth = p.width;
@@ -61,6 +209,24 @@ public class Ptmx {
     if(xml == null) throw new RuntimeException("Not a valid XML File or not UTF-8 encoded");
     if(xml.getName() != "map") throw new RuntimeException("Not a Tmx file (missing 'map' element)");
     loadTmxProperties(xml);
+    switch(this.orientation){
+      case "orthogonal":
+        map = new OrthogonalMap();
+        break;
+      case "isometric":
+        map = new IsometricMap();
+        break;
+      case "staggered":
+        this.hexsidelength = 0;
+      case "hexagonal":
+        if(this.staggeraxis.equals("x")){
+          map = new StaggeredXMap();
+      }
+        else{
+          map = new StaggeredYMap();
+      }
+        break;
+    }
     XML childs[] = xml.getChildren("tileset");
     for(XML e: childs) loadTileset(e);
     childs = xml.getChildren();
@@ -72,7 +238,7 @@ public class Ptmx {
         break;
     }
   }
- 
+
   private void loadTmxProperties(XML e){
     this.version = e.getFloat("version");
     this.orientation = e.getString("orientation");
@@ -86,7 +252,7 @@ public class Ptmx {
     this.hexsidelength = 0; if(e.hasAttribute("hexsidelength")) this.hexsidelength = e.getInt("hexsidelength");
     this.backgroundcolor = 0x808080; if(e.hasAttribute("backgroundcolor")) this.backgroundcolor = this.readColor(e.getString("backgroundcolor"));
   }
- 
+
   private void loadTileset(XML e){
     XML c;
     if(e.hasAttribute("source") && e.getChild("image") == null){
@@ -162,7 +328,7 @@ public class Ptmx {
         type = "objectgroup";
         XML xo[] = e.getChildren("object");
         for(XML o : xo){
-          StringDict prop = new StringDict();
+          StringDict prop = new StringDict(); //<>//
           if(o.hasAttribute("gid")){
             prop.set("object", "tile");
             prop.set("gid", o.getString("gid"));
@@ -177,8 +343,8 @@ public class Ptmx {
             prop.set("points", o.getChild("polygon").getString("points"));
           }
           else prop.set("object", "rectangle");
-          if(o.hasAttribute("id")) prop.set("id", o.getString("id")); 
-          if(o.hasAttribute("name")) prop.set("name", o.getString("name")); 
+          if(o.hasAttribute("id")) prop.set("id", o.getString("id"));
+          if(o.hasAttribute("name")) prop.set("name", o.getString("name"));
           if(o.hasAttribute("type")) prop.set("type", o.getString("type"));
           if(o.hasAttribute("visible")) prop.set("visible", o.getString("visible"));
           if(o.hasAttribute("x")) prop.set("x", o.getString("x"));
@@ -206,14 +372,14 @@ public class Ptmx {
     if(s.length() == 6) s = "FF" + s;
     return parent.unhex(s);
   }
-  
+
   private void applyTransColor(PImage source, String c){
     int trans = this.readColor(c);
     source.loadPixels();
-    for (int p = 0; p < source.pixels.length; p++) if(source.pixels[p] == trans) source.pixels[p] = parent.color(255, 1); 
+    for (int p = 0; p < source.pixels.length; p++) if(source.pixels[p] == trans) source.pixels[p] = parent.color(255, 1);
     source.updatePixels();
   }
-  
+
   private void prepareDraw(PGraphics pg, float left, float top){
     this.camwidth = pg.width;
     this.camheight = pg.height;
@@ -243,74 +409,14 @@ public class Ptmx {
     pg.popMatrix();
     if(pg != parent.g) pg.endDraw();
   }
-  
+
   private void drawLayer(PGraphics pg, int m){
     int tileoffsetx, tileoffsety, n, dif;
     float x = 0, y = 0;
     Layer l = this.layer[m];
     switch(l.type){
       case "layer":
-        switch(this.orientation){
-          case "orthogonal":
-            int  xstart = parent.max(0, parent.floor(this.camleft / this.tilewidth - this.drawmargin));
-            int  xstop = parent.min(this.mapheight, parent.floor((this.camleft + this.camwidth) / this.tilewidth + this.drawmargin));
-            int  ystart = parent.max(0, parent.floor(this.camtop / this.tileheight - this.drawmargin));
-            int  ystop = parent.min(this.mapheight, parent.floor((this.camtop + this.camheight) / this.tileheight + this.drawmargin));
-            for(int ny = ystart; ny < ystop; ny++) for(int nx = xstart; nx < xstop; nx++){
-              n = l.data[nx + ny * this.mapwidth] - 1;
-              if(n >= 0){
-                tileoffsetx = this.tile[n].offsetx;
-                tileoffsety = this.tile[n].offsety;
-                x = nx * this.tilewidth + tileoffsetx + l.offsetx;
-                y = ny * this.tileheight + tileoffsety + l.offsety + (this.tileheight - this.tile[n].image.height);
-                pg.image(this.tile[n].image, x - this.camleft, y - this.camtop);
-              }
-            }
-            break;
-          case "isometric":
-            dif = parent.floor((this.mapwidth + this.mapheight) * this.tilewidth / 4);
-            for(int ny = 0; ny < this.mapheight; ny++) for(int nx = 0; nx < this.mapwidth; nx++){
-              n = l.data[nx + ny * this.mapwidth] - 1;
-              if(n >= 0){
-                tileoffsetx = this.tile[n].offsetx;
-                tileoffsety = this.tile[n].offsety;
-                x = dif + (nx - ny) * this.tilewidth / 2 - this.tile[n].image.width/2 + tileoffsetx + l.offsetx;
-                y = (ny + nx) * this.tileheight / 2 + tileoffsety + l.offsety + (this.tileheight - this.tile[n].image.height);
-                pg.image(this.tile[n].image, x - this.camleft, y - this.camtop);
-              }
-            }
-            break;
-          case "staggered":
-            this.hexsidelength = 0;
-          case "hexagonal":
-            if(this.staggeraxis.equals("x")){
-              for(int ny = 0; ny < this.mapheight; ny++) for(int nx = 0; nx <= this.mapwidth; nx+=2) for(int nz = this.staggerindex; nz >= this.staggerindex - 1; nz--){
-                if(nx + nz >= 0 && nx + nz < this.mapwidth){
-                  n = l.data[nx + nz + ny * this.mapwidth] - 1;
-                  if(n >= 0){
-                    tileoffsetx = this.tile[n].offsetx;
-                    tileoffsety = this.tile[n].offsety;
-                    x = (nx + nz) * (this.hexsidelength + this.tilewidth) / 2 + tileoffsetx + l.offsetx;
-                    y = (ny * 2 + ((nx + nz + this.staggerindex) % 2)) * this.tileheight / 2 + tileoffsety + l.offsety + (this.tileheight - this.tile[n].image.height);
-                    pg.image(this.tile[n].image, x - this.camleft, y - this.camtop);
-                  }
-                }
-              }
-            }
-            else{
-              for(int ny = 0; ny < this.mapheight; ny++) for(int nx = 0; nx < this.mapwidth; nx++){
-                n = l.data[nx + ny * this.mapwidth] - 1;
-                if(n >= 0){
-                  tileoffsetx = this.tile[n].offsetx;
-                  tileoffsety = this.tile[n].offsety;
-                  x = (nx * 2 + ((ny + this.staggerindex) % 2)) * this.tilewidth / 2 + tileoffsetx + l.offsetx;
-                  y = ny * (this.hexsidelength + this.tileheight) / 2 + tileoffsety + l.offsety + (this.tileheight - this.tile[n].image.height);
-                  pg.image(this.tile[n].image, x - this.camleft, y - this.camtop);
-                }
-              }
-            }
-            break;
-        }
+        map.drawTileLayer(pg, m);
         break;
       case "imagelayer":
         pg.image(l.image, -this.camleft + l.offsetx, -this.camtop + l.offsety);
@@ -324,7 +430,7 @@ public class Ptmx {
             pg.pushStyle();
             pg.ellipseMode(parent.CORNER);
             pg.translate(parent.parseFloat(o.get("x")) - l.offsetx - this.camleft, parent.parseFloat(o.get("y"))- l.offsety - this.camtop);
-            if(o.hasKey("rotation")) pg.rotate(parent.parseFloat(o.get("rotation")) * parent.PI / 180);                
+            if(o.hasKey("rotation")) pg.rotate(parent.parseFloat(o.get("rotation")) * parent.PI / 180);
             switch(o.get("object")){
               case "rectangle":
                 pg.rect(0, 0, parent.parseFloat(o.get("width")), parent.parseFloat(o.get("height")));
@@ -358,7 +464,7 @@ public class Ptmx {
     if(pg != parent.g && l.opacity < 1){//applyOpacity
       pg.loadPixels();
       int a = parent.parseInt(parent.map(l.opacity, 0, 1, 1, 255));
-      for (int p = 0; p < pg.pixels.length; p++) if(parent.alpha(pg.pixels[p]) > a) pg.pixels[p] = parent.color(parent.red(pg.pixels[p]), parent.green(pg.pixels[p]), parent.blue(pg.pixels[p]), a); 
+      for (int p = 0; p < pg.pixels.length; p++) if(parent.alpha(pg.pixels[p]) > a) pg.pixels[p] = parent.color(parent.red(pg.pixels[p]), parent.green(pg.pixels[p]), parent.blue(pg.pixels[p]), a);
       pg.updatePixels();
     }
   }
@@ -369,15 +475,15 @@ public class Ptmx {
   public void draw(){
     this.draw(parent.g, 0, 0);
   }
-  
+
   public void draw(PVector p){
     this.draw(parent.g, parent.floor(p.x), parent.floor(p.y));
   }
-  
+
   public void draw(float left, float top){
     this.draw(parent.g, left, top);
   }
-  
+
   public void draw(int n, PVector p){
     this.draw(parent.g, n, p.x, p.y);
   }
@@ -389,7 +495,7 @@ public class Ptmx {
   public void draw(PGraphics pg){
     this.draw(pg, 0, 0);
   }
-  
+
   public void draw(PGraphics pg, PVector p){
     this.draw(pg, p.x, p.y);
   }
@@ -399,7 +505,7 @@ public class Ptmx {
     for(int n = 0; n < layer.length; n++) if(this.layer[n].visible) this.drawLayer(pg, n);
     this.finishDraw(pg);
   }
-  
+
   public void draw(PGraphics pg, int n, PVector p){
     this.draw(pg, n, p.x, p.y);
   }
@@ -462,12 +568,12 @@ public class Ptmx {
     if(n >= 0 && n < this.layer.length && o >= 0 && o <=1) this.layer[n].opacity = parent.min(parent.max(0, o), 1);
   }
 
-  public int getTileInfo(int n, int x, int y){
+  public int getTileIndex(int n, int x, int y){
     if(n >= 0 && n < this.layer.length && x >= 0 && y >= 0 && x < this.mapwidth && y < this.mapheight && this.layer[n].type.equals("layer")) return this.layer[n].data[x + y * this.mapwidth] - 1;
     else return -2;
   }
 
-  public void setTileInfo(int n, int x, int y, int v){
+  public void setTileIndex(int n, int x, int y, int v){
     if(n >= 0 && n < this.layer.length && x >= 0 && y >= 0 && x < this.mapwidth && y < this.mapheight && this.layer[n].type.equals("layer") && v >= -1) this.layer[n].data[x + y * this.mapwidth] = v + 1;
   }
 
@@ -520,24 +626,24 @@ public class Ptmx {
       this.camleft = ml;
       this.camtop = mt;
     }
-  }  
-  
+  }
+
 //Map methods
 
   public String getFilename(){
-	    return this.filename;    
+	    return this.filename;
 	  }
 
   public float getVersion(){
-    return this.version;    
+    return this.version;
   }
 
   public int getBackgroundColor(){
-    return this.backgroundcolor;    
+    return this.backgroundcolor;
   }
 
   public PVector getMapSize(){
-    return new PVector(this.mapwidth, this.mapheight);    
+    return new PVector(this.mapwidth, this.mapheight);
   }
 
   public PVector getTileSize(){
@@ -545,7 +651,7 @@ public class Ptmx {
   }
 
   public int getHexSideLength(){
-    return this.hexsidelength;    
+    return this.hexsidelength;
   }
 
   public PVector getCamCorner(){
@@ -559,7 +665,7 @@ public class Ptmx {
   }
 
   public PVector getCamSize(){
-    return new PVector(this.camwidth, this.camheight);    
+    return new PVector(this.camwidth, this.camheight);
   }
 
   public void setCamSize(PVector s){ //Only useful for some pre-draw calculations, since size is always the last PGraphics used.
@@ -568,9 +674,9 @@ public class Ptmx {
 
   public void setCamSize(int w, int h){
     this.camwidth = w;
-    this.camheight = h;    
+    this.camheight = h;
   }
-  
+
   public int getDrawMargin(){
     return this.drawmargin;
   }
@@ -578,7 +684,7 @@ public class Ptmx {
   public void setDrawMargin(int n){ //for orthogonal maps
     this.drawmargin = parent.max(1, n);
   }
-  
+
   public int getDrawMode(){//CORNER or CENTER
     return this.drawmode;
   }
@@ -594,82 +700,30 @@ public class Ptmx {
   public void setPositionMode(String s){
     if(s.equals("CANVAS") || s.equals("MAP")) this.positionmode = s;
   }
-  
+
   public PVector getPosition(){
     if(this.drawmode == parent.CORNER) return this.getCamCorner();
     else return this.getCamCenter();
   }
 
 //Coordinate methods
-  
+
   public PVector canvasToMap(PVector p){
     return this.canvasToMap(p.x, p.y);
   }
 
   public PVector canvasToMap(float x, float y){
-    float nx = 0, ny = 0, dif;
-    switch(this.orientation){
-      case "orthogonal":
-        nx = x / this.tilewidth - (float)0.5;
-        ny = y / this.tileheight - (float)0.5;
-        break;
-      case "isometric":
-        dif = ((float)this.mapwidth + this.mapheight) * this.tilewidth / 4;
-        nx = y / this.tileheight + ((x - dif) / this.tilewidth) - (float)0.5;
-        ny = y / this.tileheight - ((x - dif) / this.tilewidth) - (float)0.5;
-        break;
-      case "staggered":
-        this.hexsidelength = 0;
-      case "hexagonal":
-        if(this.staggeraxis.equals("x")){
-          nx = (x - this.tilewidth / 2) * 2 / (this.hexsidelength + this.tilewidth);
-          if(this.staggerindex == 0) ny = y / this.tileheight - (float)0.5 + (parent.abs((nx % 2) - 1) - 1) / 2;
-          else ny = y / this.tileheight - 1 - (parent.abs((nx % 2) - 1) - 1) / 2;
-        }
-        else{
-          ny = (y - this.tileheight / 2) * 2 / (this.hexsidelength + this.tileheight);
-          if(this.staggerindex == 0) nx = x / this.tilewidth - (float)0.5 + (parent.abs((ny % 2) - 1) - 1) / 2;
-          else nx = x / this.tilewidth - 1 - (parent.abs((ny % 2) - 1) - 1) / 2;
-        }
-        break;
-    }
-    return new PVector(nx, ny);
+    return map.canvasToMap(x, y);
   }
-  
+
   public PVector mapToCanvas(PVector p){
     return this.mapToCanvas(p.x, p.y);
   }
-  
+
   public PVector mapToCanvas(float nx, float ny){
-    float x = 0, y = 0;
-    int sig = 1;
-      switch(this.orientation){
-        case "orthogonal":
-          x = (nx * 2 + 1) * this.tilewidth / 2;
-          y = (ny * 2 + 1) * this.tileheight / 2;
-          break;
-        case "isometric":
-          x = (this.mapwidth + this.mapheight) * this.tilewidth / 4 + (nx - ny) * this.tilewidth / 2;
-          y = (nx + ny + 1) * this.tileheight / 2;
-          break;
-        case "staggered":
-          this.hexsidelength = 0;
-        case "hexagonal":
-          if(this.staggeraxis.equals("x")){
-            if(nx < 0) sig = -1;
-            x = this.tilewidth / 2 + nx * (this.hexsidelength + this.tilewidth) / 2;
-            y = (ny + (float)0.5 + (float)this.staggerindex / 2) * this.tileheight + (this.staggerindex * 2 - 1) * (parent.abs((nx % 2) - sig * 1) - 1) * (this.hexsidelength + this.tilewidth) / 4;
-          }
-          else{
-            if(ny < 0) sig = -1;
-            y = this.tileheight / 2 + ny * (this.hexsidelength + this.tileheight) / 2;
-            x = (nx + (float)0.5 + (float)this.staggerindex / 2) * this.tilewidth + (this.staggerindex * 2 - 1) * (parent.abs((ny % 2) -  sig * 1) - 1) * (this.hexsidelength + this.tileheight);
-          }
-          break;
-      }
-    return new PVector(x , y);
+    return map.mapToCanvas(nx, ny);
   }
-  
+
   public PVector camToCanvas(PVector p){
     return this.camToCanvas(p.x, p.y);
   }
@@ -693,12 +747,12 @@ public class Ptmx {
   public PVector camToMap(float x, float y){
     return this.canvasToMap(this.camToCanvas(x, y));
   }
-  
+
   public PVector mapToCam(PVector p){
     return this.mapToCam(p.x, p.y);
   }
 
   public PVector mapToCam(float nx, float ny){
-    return this.canvasToCam(this.mapToCanvas(nx, ny));   
+    return this.canvasToCam(this.mapToCanvas(nx, ny));
   }
 }

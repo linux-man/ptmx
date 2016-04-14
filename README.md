@@ -86,8 +86,8 @@ Attention: Tiled store tiles index as index + 1, so 0 is a "no tile". This is in
 ###void setOpacity(int index, float opacity)
 Opacity is used when drawing individual layers (and on toImage method).
 
-###int getTileInfo(int index, int x, int y)
-###void setTileInfo(int index, int x, int y, int value)
+###int getTileIndex(int index, int x, int y)
+###void setTileIndex(int index, int x, int y, int value)
 Tile indexes are the same you see on Tiled.
 -1 for "no tile".
 Return -2 if coordinates are out of bounds.
@@ -95,7 +95,7 @@ Return -2 if coordinates are out of bounds.
 ###void toImage(int index)
 Turn a object or tile layer into a image layer. May be useful if you don't need tile or object info, and want a specific opacity on a layer. Opacity is used when creating the image. The created image is truncated to map limits.
   
-//Map methods
+##Map methods
 
 ###String getFilename()
 
@@ -139,7 +139,7 @@ In "MAP" PositionMode, coordinates are relative to tiles, so (5, 4) points to th
 ###PVector getPosition()
 Return last draw position. Dependent of DrawMode and PositionMode
 
-##Conversion of Coordinates methods
+##Coordinates Conversion methods
   
 ###PVector canvasToMap(PVector p)
 ###PVector canvasToMap(float x, float y)
