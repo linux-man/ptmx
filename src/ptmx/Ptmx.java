@@ -15,6 +15,7 @@ public class Ptmx {
   private int drawmargin = 2;
   private int drawmode = 0;//0=CORNER, 3=CENTER
   private String positionmode = "CANVAS";//"CANVAS" or "MAP"
+  private String backgroundmode = "COLOR";//"COLOR", "CLEAR" or "NONE"
   private Tile[] tile = new Tile[0];
   private Layer[] layer = new Layer[0];
   private Xmap map;
@@ -252,7 +253,7 @@ public class Ptmx {
     this.staggerindex = 0; if(e.hasAttribute("staggerindex")) if(e.getString("staggerindex").equals("even")) this.staggerindex = 1;
     this.staggeraxis = "x"; if(e.hasAttribute("staggeraxis")) this.staggeraxis = e.getString("staggeraxis");
     this.hexsidelength = 0; if(e.hasAttribute("hexsidelength")) this.hexsidelength = e.getInt("hexsidelength");
-    this.backgroundcolor = 0x808080; if(e.hasAttribute("backgroundcolor")) this.backgroundcolor = this.readColor(e.getString("backgroundcolor"));
+    this.backgroundcolor = parent.color(80, 80, 80); if(e.hasAttribute("backgroundcolor")) this.backgroundcolor = this.readColor(e.getString("backgroundcolor"));
   }
 
   private void loadTileset(XML e){
@@ -370,7 +371,7 @@ public class Ptmx {
   }
 
   private int readColor(String s){
-    if(s.length() == 7) s = s.substring(1);
+    if(s.charAt(0) == '#') s = s.substring(1);
     if(s.length() == 6) s = "FF" + s;
     return parent.unhex(s);
   }
@@ -389,7 +390,7 @@ public class Ptmx {
       PVector p = this.mapToCanvas(left, top);
       left = p.x;
       top = p.y;
-	}
+    }
     if(this.drawmode == 3){
       this.camleft = parent.floor(left - this.camwidth / 2);
       this.camtop = parent.floor(top - this.camheight / 2);
@@ -403,7 +404,15 @@ public class Ptmx {
     pg.resetMatrix();
     pg.pushStyle();
     pg.imageMode(parent.CORNER);
-    pg.clear();
+    switch(this.backgroundmode) {
+      case "COLOR":
+        pg.background(this.backgroundcolor);
+        break;
+      case "CLEAR":
+        if(pg != parent.g) pg.clear();
+        else pg.background(this.backgroundcolor);
+        break;
+    }
   }
 
   private void finishDraw(PGraphics pg){
@@ -706,6 +715,14 @@ public class Ptmx {
   public PVector getPosition(){
     if(this.drawmode == parent.CORNER) return this.getCamCorner();
     else return this.getCamCenter();
+  }
+
+  public String getBackgroundMode(){//"COLOR", "CLEAR" or "NONE"
+    return this.backgroundmode;
+  }
+
+  public void setBackgroundMode(String s){
+    if(s.equals("COLOR") || s.equals("CLEAR") || s.equals("NONE")) this.backgroundmode = s;
   }
 
 //Coordinate methods

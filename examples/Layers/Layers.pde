@@ -20,7 +20,9 @@ void setup() {
 
 void draw(){
   background(map.getBackgroundColor());
+  map.setBackgroundMode("COLOR");
   map.draw(layer0, 0, x, y);
+  map.setBackgroundMode("CLEAR");
   map.draw(layer1, 1, x, y);
   map.draw(layer2, 2, x, y);
   image(layer0, 0, 0);
