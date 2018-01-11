@@ -131,13 +131,13 @@ CORNER or CENTER. Default: CORNER.
 Affect draw coordinates. Draw position corresponds to left-top corner or graphics/window center.
 
 ### String getPositionMode
-### setPositionMode(String mode)
+### void setPositionMode(String mode)
 "CANVAS" or "MAP". Default: "CANVAS".
 Draw coordinates can be relative to the image created when drawing tiles and objects ("CANVAS"). Think as distance in pixels from the left-top corner.
 In "MAP" PositionMode, coordinates are relative to tiles, so (5, 4) points to the 5th tile from the left, 4th tile from top. Diferences are notorious and useful when using isometric and hexagonal maps.
 
 ### String getBackgroundMode
-### setBackgroundMode(String mode)
+### void setBackgroundMode(String mode)
 "COLOR", "CLEAR" or "NONE". Default: "COLOR".
 Define what happens to the background before draw.
 "COLOR" - Draw Map background color.
