@@ -531,6 +531,11 @@ public class Ptmx {
 
 //Layers methods
 
+  public String getName(int n){
+    if(n >= 0 && n < this.layer.length) return this.layer[n].name;
+    else return null;
+  }
+
   public String getType(int n){
     if(n >= 0 && n < this.layer.length) return this.layer[n].type;
     else return null;

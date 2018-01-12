@@ -60,6 +60,8 @@ Draw a specific layer on a given PGraphics at position (left, top).
 ## Layers methods
 All this methods need a layer index
 
+### String getName(int layer)
+
 ### String getType(int layer)
 Return "layer", "imagelayer" or "objectgroup".
 
